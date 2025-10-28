@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Supplier Catalog Extractor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "pdfjs-dist": "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs",
+    "marked": "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js"
+  }
+}
+</script>
+<style>
+  body {
+    background-color: #080d19; /* Deeper Blue Base */
+    background-image: 
+      radial-gradient(ellipse at top, rgba(17, 24, 39, 0.8), transparent 50%),
+      radial-gradient(ellipse at bottom, rgba(185, 137, 49, 0.15), transparent 70%);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+  }
+  
+  /* Custom scrollbar for a more integrated look */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #475569; /* slate-600 */
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #d99f3b; /* Brighter Gold */
+  }
+
+  /* Reusable animations */
+  @keyframes slide-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in-scale {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  /* New animation for staggered list item entrances */
+  @keyframes slide-in-up-stagger {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-slide-in-up {
+    animation: slide-in-up 0.5s ease-out forwards;
+  }
+  .animate-fade-in-scale {
+    animation: fade-in-scale 0.4s ease-out forwards;
+  }
+  .animate-slide-in-up-stagger {
+    opacity: 0; /* Start hidden */
+    animation: slide-in-up-stagger 0.5s ease-out forwards;
+  }
+  
+  /* Chat bubble markdown styling */
+  .chat-bubble ul, .chat-bubble ol { margin-top: 0.5rem; margin-bottom: 0.5rem; padding-left: 1.5rem; }
+  .chat-bubble ul { list-style-type: disc; }
+  .chat-bubble ol { list-style-type: decimal; }
+  .chat-bubble li { margin-bottom: 0.25rem; }
+  .chat-bubble a { color: #38bdf8; text-decoration: underline; }
+  .chat-bubble code { background-color: #0f172a; padding: 0.125rem 0.3rem; border-radius: 0.25rem; font-family: monospace; font-size: 0.9em; }
+  .chat-bubble pre { background-color: #0f172a; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin: 0.5rem 0; }
+  .chat-bubble pre code { padding: 0; background-color: transparent; }
+  .chat-bubble blockquote { border-left: 4px solid #475569; padding-left: 1rem; margin: 0.5rem 0; font-style: italic; color: #94a3b8; }
+  .chat-bubble table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  .chat-bubble th, .chat-bubble td { border: 1px solid #475569; padding: 0.5rem; }
+  .chat-bubble th { background-color: #1e293b; }
+  .chat-bubble p { margin-bottom: 0.5rem; }
+  .chat-bubble p:last-child { margin-bottom: 0; }
+</style>
+</head>
+  <body class="bg-slate-950">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

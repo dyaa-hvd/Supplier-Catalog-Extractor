@@ -1,0 +1,5 @@
+{
+  "name": "Supplier Catalog Extractor",
+  "description": "An intelligent tool that scrapes and organizes product data from supplier websites using AI. It extracts categories, products, details, and specifications, then enhances and structures the information for easy use.",
+  "requestFramePermissions": []
+}
