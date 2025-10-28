@@ -1,7 +1,7 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type } from "https://aistudiocdn.com/@google/genai@^1.27.0";
 import { ScrapedData, ScrapeInput, DetectionResult, ChatMessage } from '../types';
-import * as pdfjsLib from 'pdfjs-dist';
-import { getDocument } from 'pdfjs-dist/build/pdf';
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
+
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
 // Initialize the GoogleGenAI client with the API key from environment variables.

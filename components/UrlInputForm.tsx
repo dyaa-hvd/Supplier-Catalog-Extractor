@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 // FIX: Import centralized LoadingState type and remove local definition for consistency.
 import { ScrapeInput, DetectionResult, LoadingState } from '../types';
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
 
 // Set the workerSrc for pdf.js to load its worker script from a CDN
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
@@ -32,7 +32,7 @@ const LoadingSpinner = (props: React.SVGProps<SVGSVGElement>) => (<svg className
 
 // --- RENDERERS & MODALS ---
 const DetectionResultDisplay: React.FC<{ result: DetectionResult }> = ({ result }) => (
-    <div className="p-3 rounded-lg border bg-slate-800/50 border-slate-700">
+    <div className="p-3 rounded-lg border bg-slate-800/50 border-slate-700 animate-slide-in-up">
         <p className="text-xs font-bold text-slate-400 truncate mb-2">{result.source}</p>
         <div className={`flex items-start text-sm`}>
             <div className={`mr-2 flex-shrink-0 mt-0.5 text-${result.confidence === 'High' ? 'green' : result.confidence === 'Medium' ? 'yellow' : 'red'}-400`}>
@@ -161,8 +161,8 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            // FIX: Explicitly catch the error. While `catch {}` is valid, `catch (error)` is more conventional and can prevent issues with certain build tools that might lead to unexpected behavior with untyped error objects.
-            } catch (error) {
+            // FIX: The error object from a catch block is of type `unknown` and was causing a type error. Since the error object is not used, switching to a catch clause without a binding (`catch {}`) is cleaner and resolves the issue.
+            } catch {
                 setError(`Invalid URL format: ${url}`);
                 return null;
             }
@@ -229,35 +229,55 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
                       High Quality OCR <span className="text-xs text-slate-400">(Slower)</span>
                   </label>
                   <button
-                    type="button" id="ocr-toggle" role="switch" aria-checked={ocrQuality === 'high'}
+                    type="button"
+                    role="switch"
+                    id="ocr-toggle"
+                    aria-checked={ocrQuality === 'high'}
                     onClick={() => onOcrQualityChange(ocrQuality === 'high' ? 'standard' : 'high')}
-                    className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-sky-500 ${ocrQuality === 'high' ? 'bg-sky-600' : 'bg-slate-600'}`}
+                    disabled={anyLoading}
+                    className={`${
+                        ocrQuality === 'high' ? 'bg-sky-600' : 'bg-slate-600'
+                    } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-800`}
                   >
-                    <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${ocrQuality === 'high' ? 'translate-x-6' : 'translate-x-1'}`}/>
+                    <span
+                        className={`${
+                            ocrQuality === 'high' ? 'translate-x-6' : 'translate-x-1'
+                        } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                    />
                   </button>
                 </div>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                    {files.map((file, index) => (
-                        <div key={index} className="flex items-center gap-3 bg-slate-800/50 p-2 rounded-lg">
-                            <PdfPreview file={file} />
-                            <span className="flex-grow text-sm text-sky-300 truncate">{file.name}</span>
-                            <button type="button" onClick={() => removeFile(index)} disabled={anyLoading} className="p-1 text-slate-400 hover:text-red-400"><TrashIcon /></button>
-                        </div>
-                    ))}
-                </div>
+                {files.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                        {files.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between bg-slate-800/50 p-2 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <PdfPreview file={file} />
+                                    <div className="text-sm">
+                                        <p className="font-medium text-slate-200 truncate max-w-[150px]">{file.name}</p>
+                                        <p className="text-xs text-slate-400">{(file.size / 1024).toFixed(1)} KB</p>
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => removeFile(index)} disabled={anyLoading} className="p-2 text-slate-400 hover:text-red-400 disabled:opacity-50"><TrashIcon /></button>
+                            </div>
+                        ))}
+                    </div>
+                )}
            </>
         )}
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
       </div>
+
+      {detectionResults && <DetectionResultsList results={detectionResults} />}
+
+      {error && <p className="text-sm text-red-400 mt-3 animate-slide-in-up">{error}</p>}
       
-       {detectionResults && !anyLoading && <DetectionResultsList results={detectionResults} />}
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-          <button type="button" onClick={handleAction(onDetect)} disabled={anyLoading} className="w-full flex items-center justify-center px-4 py-3 bg-sky-700 hover:bg-sky-600 text-white font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-sky-400 transition-all disabled:bg-slate-700/50">
-            {isDetecting ? <><LoadingSpinner className="-ml-1 mr-3" />Detecting...</> : <><DetectIcon className="h-5 w-5 mr-2" />Detect Products</>}
+      <div className="flex flex-col sm:flex-row gap-3 mt-6">
+          <button type="submit" onClick={handleAction(onDetect)} disabled={anyLoading} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors disabled:bg-slate-800 disabled:text-slate-500">
+              {isDetecting ? <LoadingSpinner /> : <DetectIcon />}
+              Detect Products
           </button>
-          <button type="button" onClick={handleAction(onSubmit)} disabled={anyLoading} className="w-full flex items-center justify-center px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-400 transition-all disabled:bg-amber-500/50">
-            {loadingState.active ? <><LoadingSpinner className="-ml-1 mr-3 text-white" />{loadingState.stage}</> : <><ScrapeIcon className="h-5 w-5 mr-2" />Scrape Data</>}
+          <button type="submit" onClick={handleAction(onSubmit)} disabled={anyLoading} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors disabled:bg-amber-800/50 disabled:text-slate-400">
+              {loadingState.active ? <LoadingSpinner /> : <ScrapeIcon />}
+              Scrape Data
           </button>
       </div>
     </form>
