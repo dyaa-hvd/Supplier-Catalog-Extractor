@@ -4,9 +4,8 @@ import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
-// FIX: Instead of a single instance, create a function to get the client just-in-time.
-// This ensures process.env.API_KEY is available when the API is called.
-const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY! });
+// Use the hardcoded API key for all requests.
+const getAiClient = () => new GoogleGenAI({ apiKey: 'AIzaSyC3gpn8LKDgrBUpMP8mkNbY71A4x2qwgWQ' });
 
 // --- Helper Functions ---
 

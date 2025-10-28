@@ -162,7 +162,7 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
             // FIX: The unbound catch statement was causing a type error in some environments. Changed to a standard catch.
-            } catch (error) {
+            } catch (e) {
                 setError(`Invalid URL format: ${url}`);
                 return null;
             }
