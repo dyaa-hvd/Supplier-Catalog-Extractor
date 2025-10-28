@@ -4,8 +4,9 @@ import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
-// Initialize the GoogleGenAI client with the API key from environment variables.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+// FIX: Instead of a single instance, create a function to get the client just-in-time.
+// This ensures process.env.API_KEY is available when the API is called.
+const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
 // --- Helper Functions ---
 
@@ -57,6 +58,7 @@ const pdfToImagesBase64 = async (file: File): Promise<{ mimeType: string; data: 
 // --- API Functions ---
 
 export const detectProducts = async (inputs: ScrapeInput[]): Promise<DetectionResult[]> => {
+    const ai = getAiClient(); // Initialize client just before use
     const results: DetectionResult[] = [];
     const model = 'gemini-2.5-flash';
 
@@ -168,6 +170,7 @@ export const scrapeSupplierData = async (
     onProgress: (update: { stage: string; progress?: { current: number; total: number } }) => void,
     ocrQuality: 'standard' | 'high'
 ): Promise<ScrapedData> => {
+    const ai = getAiClient(); // Initialize client just before use
     // Select model based on complexity and quality requirement. gemini-2.5-pro for high-quality multimodal tasks.
     const model = ocrQuality === 'high' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
     let combinedData: ScrapedData = { supplierName: '', categories: [] };
@@ -267,6 +270,7 @@ export const chatWithDataStream = async function* (
     message: string,
     history: ChatMessage[]
 ) {
+    const ai = getAiClient(); // Initialize client just before use
     // Use `ai.chats.create` for conversational chat and streaming.
     const chat = ai.chats.create({
         model: 'gemini-2.5-pro', // Use a powerful model for data analysis

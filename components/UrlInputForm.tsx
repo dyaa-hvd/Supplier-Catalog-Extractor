@@ -161,7 +161,7 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            // FIX: The error object from a catch block is of type `unknown` and was causing a type error. Since the error object is not used, switching to a catch clause without a binding (`catch {}`) is cleaner and resolves the issue.
+            // FIX: The error object from a catch block is of type `unknown`. Since the error object is not used, an unbound catch is used to prevent potential type errors.
             } catch {
                 setError(`Invalid URL format: ${url}`);
                 return null;
