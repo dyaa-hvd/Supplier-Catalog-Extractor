@@ -1,6 +1,4 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-// FIX: Import centralized LoadingState type and remove local definition for consistency.
 import { ScrapeInput, DetectionResult, LoadingState } from '../types';
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
 
@@ -158,11 +156,12 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             return null;
         }
         for (const url of validUrls) {
+            // FIX: The 'error' object in a catch block is of type 'unknown'. Accessing properties like 'error.type' causes a TypeScript error.
+            // This is fixed by catching the error without using it, as any error from `new URL()` indicates an invalid URL format.
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            // FIX: The unbound catch statement was causing a type error in some environments. Changed to a standard catch.
-            } catch (error) {
+            } catch (_error) {
                 setError(`Invalid URL format: ${url}`);
                 return null;
             }

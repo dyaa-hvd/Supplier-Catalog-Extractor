@@ -166,7 +166,20 @@ const SummaryItem: React.FC<{ value: number, label: string }> = ({ value, label 
     </div>
 );
 
-const ControlsPanel: React.FC<any> = ({ allCategories, selectedCategories, onCategoryToggle, onClearFilters, searchQuery, onSearchChange, sortOption, onSortChange, onResetView, hasActiveFilters }) => {
+interface ControlsPanelProps {
+    allCategories: string[];
+    selectedCategories: Set<string>;
+    onCategoryToggle: (category: string) => void;
+    onClearFilters: () => void;
+    searchQuery: string;
+    onSearchChange: (query: string) => void;
+    sortOption: string;
+    onSortChange: (option: string) => void;
+    onResetView: () => void;
+    hasActiveFilters: boolean;
+}
+
+const ControlsPanel: React.FC<ControlsPanelProps> = ({ allCategories, selectedCategories, onCategoryToggle, onClearFilters, searchQuery, onSearchChange, sortOption, onSortChange, onResetView, hasActiveFilters }) => {
     return (
         <div className="space-y-6">
              <div className="grid grid-cols-1 gap-4">
@@ -222,7 +235,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = (props) => {
     return (
-        <aside className="lg:col-span-1 xl:col-span-1 lg:sticky top-8 self-start bg-slate-900/70 border border-slate-700/50 p-6 rounded-xl shadow-2xl shadow-black/30 backdrop-blur-md">
+        <aside className="lg:col-span-1 xl:col-span-1 lg:sticky top-8 self-start bg-slate-900/70 border border-slate-700/50 p-6 rounded-xl shadow-2xl shadow-black/30 backdrop-blur-md lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
             <div className="mb-6 pb-6 border-b border-slate-700/80">
                 <h1 className="text-2xl font-bold text-white">Supplier Catalog <span className="text-amber-400">Extractor</span></h1>
                 <p className="text-slate-300 mt-2">
