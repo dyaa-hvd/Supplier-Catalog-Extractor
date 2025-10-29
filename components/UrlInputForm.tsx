@@ -161,8 +161,10 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            // FIX: The unbound catch statement was causing a type error in some environments. Changed to a standard catch.
-            } catch (e) {
+            // FIX: Changed `catch(e)` to an unbound `catch` as the error object was unused.
+            // This resolves the "Property 'type' does not exist on type 'unknown'" error,
+            // which can occur in strict TypeScript environments with unused catch variables.
+            } catch {
                 setError(`Invalid URL format: ${url}`);
                 return null;
             }
