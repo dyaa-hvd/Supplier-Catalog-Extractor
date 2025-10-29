@@ -1,6 +1,7 @@
 
+
+
 import React, { useState, useRef, useEffect } from 'react';
-// FIX: Import centralized LoadingState type and remove local definition for consistency.
 import { ScrapeInput, DetectionResult, LoadingState } from '../types';
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
 
@@ -161,7 +162,7 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            // FIX: Changed `catch(e)` to an unbound `catch` as the error object was unused.
+            // FIX: Use an unbound catch clause as the error object is not used.
             // This resolves the "Property 'type' does not exist on type 'unknown'" error,
             // which can occur in strict TypeScript environments with unused catch variables.
             } catch {

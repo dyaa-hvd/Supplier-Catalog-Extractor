@@ -1,11 +1,12 @@
-import { GoogleGenAI, Type } from "https://aistudiocdn.com/@google/genai@^1.27.0";
+// FIX: Use standard import for @google/genai package.
+import { GoogleGenAI, Type } from "@google/genai";
 import { ScrapedData, ScrapeInput, DetectionResult, ChatMessage } from '../types';
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
-// Use the hardcoded API key for all requests.
-const getAiClient = () => new GoogleGenAI({ apiKey: 'AIzaSyC3gpn8LKDgrBUpMP8mkNbY71A4x2qwgWQ' });
+// FIX: Use environment variable for API key instead of hardcoding it.
+const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Helper Functions ---
 
@@ -57,49 +58,55 @@ const pdfToImagesBase64 = async (file: File): Promise<{ mimeType: string; data: 
 // --- API Functions ---
 
 export const detectProducts = async (inputs: ScrapeInput[]): Promise<DetectionResult[]> => {
-    const ai = getAiClient(); // Initialize client just before use
+    const ai = getAiClient();
     const results: DetectionResult[] = [];
     const model = 'gemini-2.5-flash';
 
     for (const input of inputs) {
-        let content: string;
-        let source: string;
-        if (input.type === 'url') {
-            source = input.value as string;
-            // NOTE: In a real-world scenario, you'd fetch the URL content on a server-side proxy
-            // to avoid CORS issues. For this example, we'll ask the model to analyze the URL's purpose.
-            content = `Please analyze the likely content of the following URL: ${source}`;
-        } else {
-            const file = input.value as File;
-            source = file.name;
-            content = await getTextFromPdf(file);
-        }
-
-        const prompt = `
-            Analyze the following content and determine if it is a product catalog or a page listing products for sale.
-            Provide a confidence level (High, Medium, Low) and a brief one-sentence summary of your reasoning.
-            Preserve any special characters or symbols (e.g., ©, Ä) accurately in your summary.
-            Do not analyze the URL itself, but the content provided (or the likely content of the URL).
-
-            Content to analyze:
-            ---
-            ${content.substring(0, 30000)}
-            ---
-
-            Respond in JSON format with "confidence" and "summary" keys. Example: {"confidence": "High", "summary": "The page lists multiple products with prices and descriptions."}
-        `;
+        const source = input.type === 'url' ? (input.value as string) : (input.value as File).name;
 
         try {
-            const response = await ai.models.generateContent({
-                model: model,
-                // FIX: Use a structured request format instead of a raw string to prevent proxy errors.
-                // This robust format is less prone to misinterpretation by intermediate services.
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                config: { responseMimeType: 'application/json' }
-            });
+            let response;
+            if (input.type === 'url') {
+                const prompt = `
+                    Access the content of this URL: ${input.value as string}.
+                    Based on its content, determine if it is a product catalog or a page listing products for sale.
+                    Provide a confidence level (High, Medium, Low) and a brief one-sentence summary of your reasoning.
+                    Preserve any special characters or symbols (e.g., ©, Ä) accurately in your summary.
+                    Your entire response must be ONLY a single, clean JSON object with "confidence" and "summary" keys. Example: {"confidence": "High", "summary": "The page lists multiple products with prices and descriptions."}
+                `;
+                response = await ai.models.generateContent({
+                    model: model,
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    config: { tools: [{ googleSearch: {} }] }
+                });
+            } else { // file
+                const content = await getTextFromPdf(input.value as File);
+                const prompt = `
+                    Analyze the following content from a file named "${source}" and determine if it is a product catalog or a page listing products for sale.
+                    Provide a confidence level (High, Medium, Low) and a brief one-sentence summary of your reasoning.
+                    Preserve any special characters or symbols (e.g., ©, Ä) accurately in your summary.
+
+                    Content to analyze:
+                    ---
+                    ${content.substring(0, 30000)}
+                    ---
+
+                    Respond in JSON format with "confidence" and "summary" keys. Example: {"confidence": "High", "summary": "The content lists multiple products with prices and descriptions."}
+                `;
+                response = await ai.models.generateContent({
+                    model: model,
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    config: { responseMimeType: 'application/json' }
+                });
+            }
             
             const jsonText = response.text.trim();
-            const result = JSON.parse(jsonText);
+            // A simple regex to extract JSON object from potential markdown code blocks, which can happen with non-JSON response types
+            const jsonMatch = jsonText.match(/```(json)?\s*([\s\S]*?)\s*```|({[\s\S]*})/);
+            const parsableText = jsonMatch ? (jsonMatch[2] || jsonMatch[3]) : jsonText;
+            
+            const result = JSON.parse(parsableText);
             results.push({
                 source,
                 confidence: result.confidence || 'Low',
@@ -170,56 +177,57 @@ export const scrapeSupplierData = async (
     ocrQuality: 'standard' | 'high'
 ): Promise<ScrapedData> => {
     const ai = getAiClient(); // Initialize client just before use
-    // Select model based on complexity and quality requirement. gemini-2.5-pro for high-quality multimodal tasks.
     const model = ocrQuality === 'high' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
     let combinedData: ScrapedData = { supplierName: '', categories: [] };
     let supplierNameFound = false;
+    const errors: string[] = [];
     
     onProgress({ stage: 'Preparing inputs...', progress: { current: 0, total: inputs.length } });
 
     for (let i = 0; i < inputs.length; i++) {
         const input = inputs[i];
+        const sourceName = input.type === 'url' ? (input.value as string) : (input.value as File).name;
         onProgress({ stage: `Processing ${input.type === 'url' ? 'URL' : 'file'} ${i + 1} of ${inputs.length}...`, progress: { current: i, total: inputs.length } });
 
-        // FIX: Explicitly define parts as an array of Gemini 'Part' objects.
-        // This ensures that strings are correctly formatted as { text: "..." } objects,
-        // resolving the "required oneof field 'data' must have one initialized field" error.
-        const parts: ({ text: string } | { inlineData: { mimeType: string; data: string; } })[] = [];
-        const sourceName = input.type === 'url' ? new URL(input.value as string).hostname : (input.value as File).name;
-
-        if (input.type === 'url') {
-            // NOTE: In a real-world scenario, you'd fetch the URL content on a server-side proxy
-            // to avoid CORS issues. For this example, we'll tell the model to imagine it has access.
-            parts.push({ text: `Analyze the product catalog at this URL: ${input.value as string}` });
-        } else { // file
-            parts.push({ text: `Analyze the attached product catalog document named "${sourceName}".` });
-            // Vision model requires images, so we convert PDF pages to images.
-            const imageParts = await pdfToImagesBase64(input.value as File);
-            parts.push(...imageParts.map(p => ({ inlineData: p })));
-        }
-
-        const systemInstruction = `
-You are an expert data extractor specializing in supplier product catalogs.
-Your task is to meticulously analyze the provided content (from a URL or a document) and extract all product information into a structured JSON format.
-Adhere strictly to the provided JSON schema.
-- Pay close attention to special characters, symbols (e.g., ©, ®, ™), and accented letters (e.g., Ä, é, ü). Preserve them exactly as they appear in the source content. Ensure all text is encoded correctly in UTF-8.
-- For each product variant, try to find a direct link to a brochure or datasheet and populate the 'brochureUrl' field. If no link is found, use "N/A".
-- If a value is not found for a field, use "N/A" or omit it if optional. Do not omit required fields.
-- Group products into logical categories. If no clear categories exist, create a general one like "Products".
-- A "product line" is a general product (e.g., "iPhone 15"), while "variants" are the specific versions (e.g., "128GB, Blue", "256GB, Black").
-- Extract every single product variant you can find. Be thorough.
-- Do not add any commentary or introductory text. Your output must be only the JSON object.
-`;
-
         try {
+            const parts: ({ text: string } | { inlineData: { mimeType: string; data: string; } })[] = [];
+            const config: any = {};
+
+            if (input.type === 'url') {
+                parts.push({ text: `Extract all product data from the website starting at this URL: ${input.value as string}` });
+                config.systemInstruction = `You are an expert data extractor and web crawler specializing in supplier product catalogs. Your task is to meticulously analyze the website starting from the provided URL and extract all product information into a structured JSON format.
+
+**Instructions:**
+1.  **Explore the Website**: Starting from the given URL, act as if you are browsing the site to find the main "Products," "Shop," or "Catalog" section. Follow links to categories and sub-categories to find all available products.
+2.  **Extract Every Product**: For each category you discover, you must find and extract detailed information for every single product line and all of its variants. Be extremely thorough and aim for 100% completeness.
+3.  **Find Brochures**: For each product variant, search for and extract a direct URL link to a product brochure, datasheet, or specification sheet. If no specific link is found, use "N/A".
+4.  **Preserve Data Integrity**: Pay close attention to special characters, symbols (e.g., ©, ®, ™), and accented letters (e.g., Ä, é, ü). Preserve them exactly as they appear in the source content.
+5.  **Handle Missing Data**: If a value for a required field (like price or SKU) cannot be found, you must use the string "N/A".
+6.  **Strict JSON Output**: Your entire output must be only the JSON object, with no commentary, apologies, or introductory text.`;
+                config.tools = [{googleSearch: {}}];
+            } else { // file
+                config.responseMimeType = 'application/json';
+                config.responseSchema = dataSchema;
+
+                parts.push({ text: `Analyze the attached product catalog document named "${sourceName}".` });
+                const imageParts = await pdfToImagesBase64(input.value as File);
+                parts.push(...imageParts.map(p => ({ inlineData: p })));
+                
+                config.systemInstruction = `You are an expert data extractor specializing in supplier product catalogs. Your task is to meticulously analyze the provided document pages and extract all product information into a structured JSON format.
+
+**Instructions:**
+1.  **Analyze All Pages**: Thoroughly scan every page of the provided document to find all products.
+2.  **Adhere to Schema**: Structure all extracted information strictly according to the provided JSON schema.
+3.  **Find Brochures**: For each product variant, check if there is a URL or link to a brochure, datasheet, or specification sheet. If found, populate the 'brochureUrl' field. If not, use "N/A".
+4.  **Preserve Data Integrity**: Pay close attention to special characters, symbols (e.g., ©, ®, ™), and accented letters (e.g., Ä, é, ü). Preserve them exactly as they appear in the source content.
+5.  **Handle Missing Data**: If a value for a required field (like price or SKU) cannot be found, you must use the string "N/A".
+6.  **Strict JSON Output**: Your entire output must be only the JSON object, with no commentary, apologies, or introductory text.`;
+            }
+
             const response = await ai.models.generateContent({
                 model: model,
                 contents: [{ role: 'user', parts }],
-                config: {
-                    systemInstruction,
-                    responseMimeType: 'application/json',
-                    responseSchema: dataSchema,
-                },
+                config: config,
             });
 
             const jsonText = response.text.trim();
@@ -250,13 +258,18 @@ Adhere strictly to the provided JSON schema.
             });
 
         } catch (error) {
-            console.error(`Error processing input ${i + 1}:`, error);
+            console.error(`Error processing input ${sourceName}:`, error);
             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-            throw new Error(`Failed to process input ${i + 1} (${input.type === 'url' ? input.value : sourceName}): ${errorMessage}`);
+            errors.push(`- ${sourceName}: ${errorMessage.substring(0, 150)}...`);
         }
     }
 
     onProgress({ stage: 'Finalizing data...', progress: { current: inputs.length, total: inputs.length } });
+    
+    if (errors.length > 0) {
+        throw new Error(`Scraping completed with ${errors.length} error(s):\n\n${errors.join('\n')}`);
+    }
+
     if (!combinedData.supplierName) {
         combinedData.supplierName = "Supplier Name Not Found";
     }
@@ -276,7 +289,7 @@ export const chatWithDataStream = async function* (
         model: 'gemini-2.5-pro', // Use a powerful model for data analysis
         config: {
             systemInstruction: `You are an intelligent assistant for analyzing product catalog data.
-The user has provided you with the following product data in JSON format.
+The user has provided you with the following product data, which was extracted from supplier websites or documents.
 Your answers must be based *only* on this data. Do not invent information.
 When referencing data, ensure all special characters and symbols (e.g., ©, ®, ™, Ä) are reproduced accurately.
 If the answer cannot be found in the data, say so clearly.
