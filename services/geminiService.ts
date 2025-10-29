@@ -235,7 +235,17 @@ export const scrapeSupplierData = async (
             });
 
             const jsonText = response.text.trim();
-            const result = JSON.parse(jsonText) as ScrapedData;
+            
+            // A robust regex to extract the JSON object from potential markdown code blocks, 
+            // which can happen with non-JSON response types (like when using the googleSearch tool).
+            const jsonMatch = jsonText.match(/```(json)?\s*([\s\S]*?)\s*```|({[\s\S]*})/);
+            const parsableText = jsonMatch ? (jsonMatch[2] || jsonMatch[3]) : jsonText;
+
+            if (!parsableText) {
+                throw new Error("Could not find a valid JSON object in the model's response.");
+            }
+            
+            const result = JSON.parse(parsableText) as ScrapedData;
             
              // Tag each variant with its source
             result.categories.forEach(category => {
