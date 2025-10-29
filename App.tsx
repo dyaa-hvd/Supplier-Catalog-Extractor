@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ResultsDisplay } from './components/ResultsDisplay';
 import { ScrapedData, ScrapeInput, DetectionResult, ViewMode, ChatMessage, LoadingState } from './types';
@@ -37,39 +37,6 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('ocrQuality');
     return (saved === 'standard' || saved === 'high') ? saved : 'high';
   });
-
-  // State to track if the API key is ready.
-  const [isApiKeyReady, setIsApiKeyReady] = useState(false);
-
-  // Effect to check for the API key availability.
-  useEffect(() => {
-    const checkKey = () => {
-      // Use an interval to handle potential race conditions where the aistudio object isn't ready.
-      const intervalId = setInterval(async () => {
-        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
-          if (hasKey) {
-            setIsApiKeyReady(true);
-            clearInterval(intervalId);
-          }
-        }
-      }, 500); // Check every 500ms
-      
-      // Cleanup on unmount
-      return () => clearInterval(intervalId);
-    };
-    checkKey();
-  }, []);
-
-  const handleSelectKey = async () => {
-    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-      await window.aistudio.openSelectKey();
-      // Optimistically set to true, as the user has now gone through the flow.
-      // The interval checker will confirm it shortly after.
-      setIsApiKeyReady(true);
-    }
-  };
-
 
   const handleOcrQualityChange = (quality: 'standard' | 'high') => {
       setOcrQuality(quality);
@@ -265,32 +232,6 @@ const App: React.FC = () => {
   }, [filteredAndSortedData]);
   
   const hasActiveFilters = selectedCategories.size > 0 || searchQuery.trim() !== '' || sortOption !== 'default';
-
-  // Render a loading/prompt screen until the API key is ready.
-  if (!isApiKeyReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white text-center p-4">
-        <div className="bg-slate-800/50 border border-slate-700 p-8 rounded-xl max-w-md animate-fade-in-scale">
-          <h1 className="text-2xl font-bold text-amber-400 mb-4">API Key Required</h1>
-          <p className="text-slate-300 mb-6">
-            To use this application, please select a Gemini API key. This is required to make requests to the AI model.
-          </p>
-          <button
-            onClick={handleSelectKey}
-            className="w-full px-4 py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg transition-colors"
-          >
-            Select API Key
-          </button>
-          <p className="text-xs text-slate-400 mt-4">
-            Note: Using the Gemini API may incur costs. For details, see the 
-            <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline ml-1">
-              billing documentation
-            </a>.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen text-white font-sans">

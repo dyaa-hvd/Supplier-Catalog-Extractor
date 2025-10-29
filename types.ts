@@ -1,6 +1,5 @@
-
 export interface ScrapeInput {
-  type: 'url' | 'file';
+  type: 'url' | 'file' | 'json';
   value: string | File;
 }
 
@@ -51,4 +50,4 @@ export interface ChatMessage {
   text: string;
 }
 
-export type ExportFormat = 'csv' | 'json' | 'txt';
+export type ExportFormat = 'csv' | 'json' | 'txt' | 'xlsx';
