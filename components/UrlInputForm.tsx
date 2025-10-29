@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ScrapeInput, DetectionResult, LoadingState } from '../types';
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
@@ -160,13 +162,11 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             return null;
         }
         for (const url of validUrls) {
+// FIX: Switched to a standard try-catch block for URL validation. The caught error is not used, which avoids the TypeScript error "Property 'type' does not exist on type 'unknown'" by not accessing properties on the 'unknown' error type.
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            // FIX: Using an unbound catch clause because the error object is not needed.
-            // This avoids potential TypeScript errors in strict mode where catch variables are of type `unknown`,
-            // which was causing the "Property 'type' does not exist on type 'unknown'" error.
-            } catch {
+            } catch (_error) {
                 setError(`Invalid URL format: ${url}`);
                 return null;
             }

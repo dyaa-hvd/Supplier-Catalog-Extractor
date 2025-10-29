@@ -1,3 +1,4 @@
+
 // FIX: Use standard import for @google/genai package.
 import { GoogleGenAI, Type } from "@google/genai";
 import { ScrapedData, ScrapeInput, DetectionResult, ChatMessage } from '../types';
@@ -5,8 +6,11 @@ import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
-// FIX: Use environment variable for API key instead of hardcoding it.
-const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Per user request, setting a default API key. 
+// For production deployments, it is strongly recommended to use environment variables for security.
+const API_KEY = "AIzaSyC3gpn8LKDgrBUpMP8mkNbY71A4x2qwgWQ";
+const getAiClient = () => new GoogleGenAI({ apiKey: API_KEY });
+
 
 // --- Helper Functions ---
 

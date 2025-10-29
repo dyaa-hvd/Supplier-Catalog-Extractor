@@ -166,7 +166,20 @@ const SummaryItem: React.FC<{ value: number, label: string }> = ({ value, label 
     </div>
 );
 
-const ControlsPanel: React.FC<any> = ({ allCategories, selectedCategories, onCategoryToggle, onClearFilters, searchQuery, onSearchChange, sortOption, onSortChange, onResetView, hasActiveFilters }) => {
+interface ControlsPanelProps {
+    allCategories: string[];
+    selectedCategories: Set<string>;
+    onCategoryToggle: (category: string) => void;
+    onClearFilters: () => void;
+    searchQuery: string;
+    onSearchChange: (query: string) => void;
+    sortOption: string;
+    onSortChange: (option: string) => void;
+    onResetView: () => void;
+    hasActiveFilters: boolean;
+}
+
+const ControlsPanel: React.FC<ControlsPanelProps> = ({ allCategories, selectedCategories, onCategoryToggle, onClearFilters, searchQuery, onSearchChange, sortOption, onSortChange, onResetView, hasActiveFilters }) => {
     return (
         <div className="space-y-6">
              <div className="grid grid-cols-1 gap-4">

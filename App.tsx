@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ResultsDisplay } from './components/ResultsDisplay';
-import { ApiKeyManager } from './components/ApiKeyManager';
 import { ScrapedData, ScrapeInput, DetectionResult, ViewMode, ChatMessage, LoadingState } from './types';
 import { scrapeSupplierData, detectProducts, chatWithDataStream } from './services/geminiService';
 
@@ -236,60 +235,58 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen text-white font-sans">
-      <ApiKeyManager>
-        <main className="container mx-auto p-4 md:p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            
-            <Sidebar
-              onDetect={handleDetect}
-              onSubmit={handleScrape} 
-              loadingState={loadingState}
-              isDetecting={isDetecting}
-              detectionResults={detectionResults}
-              summary={dataSummary}
-              allCategories={allCategories}
-              selectedCategories={selectedCategories}
-              onCategoryToggle={handleCategoryToggle}
-              onClearFilters={clearFilters}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              sortOption={sortOption}
-              onSortChange={setSortOption}
-              onResetView={resetView}
-              hasActiveFilters={hasActiveFilters}
-              hasData={!!scrapedData}
-              chatHistory={chatHistory}
-              isChatting={isChatting}
-              onSendMessage={handleSendMessage}
-              ocrQuality={ocrQuality}
-              onOcrQualityChange={handleOcrQualityChange}
-            />
+      <main className="container mx-auto p-4 md:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          
+          <Sidebar
+            onDetect={handleDetect}
+            onSubmit={handleScrape} 
+            loadingState={loadingState}
+            isDetecting={isDetecting}
+            detectionResults={detectionResults}
+            summary={dataSummary}
+            allCategories={allCategories}
+            selectedCategories={selectedCategories}
+            onCategoryToggle={handleCategoryToggle}
+            onClearFilters={clearFilters}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortOption={sortOption}
+            onSortChange={setSortOption}
+            onResetView={resetView}
+            hasActiveFilters={hasActiveFilters}
+            hasData={!!scrapedData}
+            chatHistory={chatHistory}
+            isChatting={isChatting}
+            onSendMessage={handleSendMessage}
+            ocrQuality={ocrQuality}
+            onOcrQualityChange={handleOcrQualityChange}
+          />
 
-            <div className="lg:col-span-2 xl:col-span-3 min-h-[80vh] bg-slate-800/20 border border-slate-700/50 p-6 rounded-xl">
-               <ResultsDisplay 
-                  displayData={filteredAndSortedData}
-                  exportData={scrapedData}
-                  loadingState={loadingState} 
-                  error={error} 
-                  viewMode={viewMode}
-                  setViewMode={setViewMode}
-               />
-            </div>
+          <div className="lg:col-span-2 xl:col-span-3 min-h-[80vh] bg-slate-800/20 border border-slate-700/50 p-6 rounded-xl">
+             <ResultsDisplay 
+                displayData={filteredAndSortedData}
+                exportData={scrapedData}
+                loadingState={loadingState} 
+                error={error} 
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+             />
           </div>
-        </main>
-        <footer className="text-center py-4 mt-8 text-xs text-slate-500 space-y-2">
+        </div>
+      </main>
+      <footer className="text-center py-4 mt-8 text-xs text-slate-500 space-y-2">
+        <p>
+          Supplier Catalog Extractor | Powered by Gemini API
+        </p>
+        <div className="border-t border-slate-700/50 w-1/4 mx-auto pt-3">
+          <p className="font-semibold text-slate-400">Built by: Dyaa Bassiony</p>
+          <p>Market Research Specialist at HVD Egypt</p>
           <p>
-            Supplier Catalog Extractor | Powered by Gemini API
+            Contact: <a href="mailto:dyaa.bassiony@hvdegypt.com" className="text-sky-400 hover:text-sky-300">dyaa.bassiony@hvdegypt.com</a>
           </p>
-          <div className="border-t border-slate-700/50 w-1/4 mx-auto pt-3">
-            <p className="font-semibold text-slate-400">Built by: Dyaa Bassiony</p>
-            <p>Market Research Specialist at HVD Egypt</p>
-            <p>
-              Contact: <a href="mailto:dyaa.bassiony@hvdegypt.com" className="text-sky-400 hover:text-sky-300">dyaa.bassiony@hvdegypt.com</a>
-            </p>
-          </div>
-        </footer>
-      </ApiKeyManager>
+        </div>
+      </footer>
     </div>
   );
 };
