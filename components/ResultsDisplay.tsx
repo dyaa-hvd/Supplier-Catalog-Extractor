@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState } from 'react';
 import { ScrapedData, LoadingState, ViewMode, ExportFormat, ProductVariant, ProductLine } from '../types';
-import * as XLSX from 'xlsx';
-import Papa from 'papaparse';
 
 // --- ICONS ---
 const GridIcon = (props: React.SVGProps<SVGSVGElement>) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>);
@@ -9,6 +8,7 @@ const TableIcon = (props: React.SVGProps<SVGSVGElement>) => (<svg xmlns="http://
 const DownloadIcon = (props: React.SVGProps<SVGSVGElement>) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>);
 const LoadingSpinner = (props: React.SVGProps<SVGSVGElement>) => (<svg className="animate-spin h-8 w-8 text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" {...props}><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>);
 const FileTextIcon = (props: React.SVGProps<SVGSVGElement>) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>);
+
 
 // --- HELPER FUNCTIONS ---
 const flattenDataForCsv = (data: ScrapedData): Record<string, string>[] => {
@@ -36,15 +36,14 @@ const flattenDataForCsv = (data: ScrapedData): Record<string, string>[] => {
 
 const convertToCSV = (data: Record<string, string>[]): string => {
     if (data.length === 0) return '';
-    // Use papaparse for proper CSV generation with proper escaping
-    return Papa.unparse(data, {
-        quotes: true,
-        quoteChar: '"',
-        escapeChar: '"',
-        delimiter: ',',
-        header: true,
-        newline: '\r\n'
-    });
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+        headers.join(','),
+        ...data.map(row =>
+            headers.map(header => JSON.stringify(row[header] || '', (key, value) => value === null ? '' : value)).join(',')
+        )
+    ];
+    return csvRows.join('\n');
 };
 
 const convertToTXT = (data: ScrapedData): string => {
@@ -69,15 +68,10 @@ const convertToTXT = (data: ScrapedData): string => {
     return txt;
 };
 
-const downloadFile = (content: string | ArrayBuffer, filename: string, mimeType: string) => {
+const downloadFile = (content: string, filename: string, mimeType: string) => {
     // Prepending a BOM (Byte Order Mark) for CSV to ensure Excel correctly interprets UTF-8 characters.
-    let blob: Blob;
-    if (typeof content === 'string') {
-        const fileContent = mimeType === 'text/csv;charset=utf-8;' ? '\uFEFF' + content : content;
-        blob = new Blob([fileContent], { type: mimeType });
-    } else {
-        blob = new Blob([content], { type: mimeType });
-    }
+    const fileContent = mimeType === 'text/csv;charset=utf-8;' ? '\uFEFF' + content : content;
+    const blob = new Blob([fileContent], { type: mimeType });
     const link = document.createElement('a');
     if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
@@ -87,68 +81,7 @@ const downloadFile = (content: string | ArrayBuffer, filename: string, mimeType:
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
     }
-};
-
-const convertToExcel = (data: ScrapedData): ArrayBuffer => {
-    const workbook = XLSX.utils.book_new();
-    
-    // Create summary sheet
-    const summaryData = [
-        ['Supplier Name', data.supplierName],
-        ['Total Categories', data.categories.length],
-        ['Total Product Lines', data.categories.reduce((sum, cat) => sum + cat.products.length, 0)],
-        ['Total Variants', data.categories.reduce((sum, cat) => sum + cat.products.reduce((pSum, prod) => pSum + prod.variants.length, 0), 0)],
-    ];
-    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
-    
-    // Create detailed data sheet
-    const flatData = flattenDataForCsv(data);
-    const dataSheet = XLSX.utils.json_to_sheet(flatData);
-    
-    // Set column widths
-    const colWidths = [
-        { wch: 20 }, // Supplier
-        { wch: 20 }, // Category
-        { wch: 25 }, // Product Line
-        { wch: 40 }, // Product Line Description
-        { wch: 25 }, // Variant Name
-        { wch: 40 }, // Variant Description
-        { wch: 12 }, // Price
-        { wch: 15 }, // SKU
-        { wch: 30 }, // Brochure URL
-        { wch: 30 }, // Source
-    ];
-    dataSheet['!cols'] = colWidths;
-    
-    XLSX.utils.book_append_sheet(workbook, dataSheet, 'Products');
-    
-    // Create category sheets
-    data.categories.forEach((category, index) => {
-        const categoryData = category.products.flatMap(product =>
-            product.variants.map(variant => ({
-                'Product Line': product.name,
-                'Product Line Description': product.description,
-                'Variant Name': variant.name,
-                'Variant Description': variant.description,
-                'Price': variant.price,
-                'SKU': variant.sku,
-                'Brochure URL': variant.brochureUrl || 'N/A',
-                'Source': variant.source || 'N/A',
-            }))
-        );
-        if (categoryData.length > 0) {
-            const categorySheet = XLSX.utils.json_to_sheet(categoryData);
-            categorySheet['!cols'] = colWidths.slice(2); // Skip supplier and category columns
-            // Sanitize sheet name (max 31 chars, no special chars)
-            const sheetName = category.name.substring(0, 31).replace(/[\\\/?\*\[\]]/g, '_');
-            XLSX.utils.book_append_sheet(workbook, categorySheet, sheetName);
-        }
-    });
-    
-    return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
 };
 
 // --- RENDER COMPONENTS ---
@@ -282,27 +215,19 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ displayData, exp
                 content = convertToCSV(flattenDataForCsv(exportData));
                 filename = `${baseFilename}.csv`;
                 mimeType = 'text/csv;charset=utf-8;';
-                downloadFile(content, filename, mimeType);
                 break;
             case 'json':
                 content = JSON.stringify(exportData, null, 2);
                 filename = `${baseFilename}.json`;
                 mimeType = 'application/json';
-                downloadFile(content, filename, mimeType);
                 break;
             case 'txt':
                 content = convertToTXT(exportData);
                 filename = `${baseFilename}.txt`;
                 mimeType = 'text/plain';
-                downloadFile(content, filename, mimeType);
-                break;
-            case 'xlsx':
-                const excelBuffer = convertToExcel(exportData);
-                filename = `${baseFilename}.xlsx`;
-                mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-                downloadFile(excelBuffer, filename, mimeType);
                 break;
         }
+        downloadFile(content, filename, mimeType);
     };
 
     if (loadingState.active) {
@@ -357,8 +282,7 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ displayData, exp
                     </div>
                      <div className="relative group">
                         <button className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg text-sm"><DownloadIcon /> Export</button>
-                        <div className="absolute top-full right-0 mt-2 w-36 bg-slate-700 border border-slate-600 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-10">
-                            <a onClick={() => handleExport('xlsx')} className="block px-4 py-2 text-sm text-slate-200 hover:bg-slate-600 cursor-pointer border-b border-slate-600">as Excel (.xlsx)</a>
+                        <div className="absolute top-full right-0 mt-2 w-32 bg-slate-700 border border-slate-600 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-10">
                             <a onClick={() => handleExport('csv')} className="block px-4 py-2 text-sm text-slate-200 hover:bg-slate-600 cursor-pointer">as CSV</a>
                             <a onClick={() => handleExport('json')} className="block px-4 py-2 text-sm text-slate-200 hover:bg-slate-600 cursor-pointer">as JSON</a>
                             <a onClick={() => handleExport('txt')} className="block px-4 py-2 text-sm text-slate-200 hover:bg-slate-600 cursor-pointer">as TXT</a>

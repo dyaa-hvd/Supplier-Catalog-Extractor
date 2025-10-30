@@ -1,12 +1,10 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ScrapeInput, DetectionResult, LoadingState } from '../types';
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
 
-// Set the workerSrc for pdf.js to load its worker script
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
+// Set the workerSrc for pdf.js to load its worker script from a CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
 interface InputFormProps {
   onDetect: (inputs: ScrapeInput[]) => void;
@@ -18,7 +16,7 @@ interface InputFormProps {
   onOcrQualityChange: (quality: 'standard' | 'high') => void;
 }
 
-type InputMode = 'url' | 'file' | 'json';
+type InputMode = 'url' | 'file';
 
 // --- ICONS ---
 const ScrapeIcon = (props: React.SVGProps<SVGSVGElement>) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>);
@@ -68,7 +66,7 @@ const PdfPreview: React.FC<{ file: File }> = ({ file }) => {
                 canvas.height = scaledViewport.height;
                 canvas.width = scaledViewport.width;
                 if (context) {
-                    await page.render({ canvasContext: context, viewport: scaledViewport, canvas }).promise;
+                    await page.render({ canvasContext: context, viewport: scaledViewport }).promise;
                 }
             }
         };
@@ -138,13 +136,9 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const acceptedType = inputMode === 'json' ? 'application/json' : 'application/pdf';
-      const extension = inputMode === 'json' ? '.json' : '.pdf';
-      const newFiles = Array.from(e.target.files as FileList).filter((f: File) => 
-        f.type === acceptedType || f.name.toLowerCase().endsWith(extension)
-      );
+      const newFiles = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
       if (newFiles.length !== e.target.files.length) {
-        setError(`Some selected files were not ${extension} files and have been ignored.`);
+        setError('Some selected files were not PDFs and have been ignored.');
       } else {
         setError('');
       }
@@ -163,22 +157,24 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             return null;
         }
         for (const url of validUrls) {
-            // FIX: The 'error' object in a catch block is of type 'unknown'. Accessing properties like 'error.type' causes a TypeScript error.
-            // This is fixed by catching the error without using it, as any error from `new URL()` indicates an invalid URL format.
+            // FIX: The error variable in a catch block is of type 'unknown' in TypeScript.
+            // Accessing properties like 'error.type' would cause a compile-time error.
+            // Since any error from `new URL()` indicates an invalid format, we can simply
+            // catch the exception without inspecting it to handle the validation failure.
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            } catch (_error) {
+            } catch {
                 setError(`Invalid URL format: ${url}`);
                 return null;
             }
         }
     } else {
         if (files.length === 0) {
-            setError(`Please select at least one ${inputMode === 'json' ? 'JSON' : 'PDF'} file.`);
+            setError('Please select at least one PDF file.');
             return null;
         }
-        inputs = files.map(f => ({ type: inputMode as 'file' | 'json', value: f }));
+        inputs = files.map(f => ({ type: 'file', value: f }));
     }
     return inputs;
   };

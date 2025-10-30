@@ -1,15 +1,12 @@
-
 // FIX: Use standard import for @google/genai package.
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { ScrapedData, ScrapeInput, DetectionResult, ChatMessage } from '../types';
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
-// Per user request, setting a default API key. 
-// For production deployments, it is strongly recommended to use environment variables for security.
-const API_KEY = "AIzaSyC3gpn8LKDgrBUpMP8mkNbY71A4x2qwgWQ";
-const getAiClient = () => new GoogleGenAI({ apiKey: API_KEY });
+// FIX: The API key must be sourced from the environment variable `process.env.API_KEY` for security.
+const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 
 // --- Helper Functions ---
@@ -70,7 +67,7 @@ export const detectProducts = async (inputs: ScrapeInput[]): Promise<DetectionRe
         const source = input.type === 'url' ? (input.value as string) : (input.value as File).name;
 
         try {
-            let response;
+            let response: GenerateContentResponse;
             if (input.type === 'url') {
                 const prompt = `
                     Access the content of this URL: ${input.value as string}.
@@ -193,6 +190,7 @@ export const scrapeSupplierData = async (
         const sourceName = input.type === 'url' ? (input.value as string) : (input.value as File).name;
         onProgress({ stage: `Processing ${input.type === 'url' ? 'URL' : 'file'} ${i + 1} of ${inputs.length}...`, progress: { current: i, total: inputs.length } });
 
+        let response: GenerateContentResponse;
         try {
             const parts: ({ text: string } | { inlineData: { mimeType: string; data: string; } })[] = [];
             const config: any = {};
@@ -207,7 +205,8 @@ export const scrapeSupplierData = async (
 3.  **Find Brochures**: For each product variant, search for and extract a direct URL link to a product brochure, datasheet, or specification sheet. If no specific link is found, use "N/A".
 4.  **Preserve Data Integrity**: Pay close attention to special characters, symbols (e.g., ©, ®, ™), and accented letters (e.g., Ä, é, ü). Preserve them exactly as they appear in the source content.
 5.  **Handle Missing Data**: If a value for a required field (like price or SKU) cannot be found, you must use the string "N/A".
-6.  **Strict JSON Output**: Your entire output must be only the JSON object, with no commentary, apologies, or introductory text.`;
+6.  **Strict JSON Output**: Your entire output must be a single, valid JSON object and nothing else. Do not wrap it in markdown backticks. Do not add any introductory text, comments, or explanations before or after the JSON.
+7.  **Error Handling**: If you are unable to access the URL or find any product data, you MUST return a valid JSON object with the supplierName set to the URL and an empty 'categories' array. Example: {"supplierName": "https://example.com", "categories": []}. Do not explain the failure in plain text or markdown.`;
                 config.tools = [{googleSearch: {}}];
             } else { // file
                 config.responseMimeType = 'application/json';
@@ -228,24 +227,39 @@ export const scrapeSupplierData = async (
 6.  **Strict JSON Output**: Your entire output must be only the JSON object, with no commentary, apologies, or introductory text.`;
             }
 
-            const response = await ai.models.generateContent({
+            response = await ai.models.generateContent({
                 model: model,
                 contents: [{ role: 'user', parts }],
                 config: config,
             });
 
+        } catch (requestError) {
+            console.error(`Error during API request for ${sourceName}:`, requestError);
+            const errorMessage = requestError instanceof Error ? requestError.message : "An unknown error occurred.";
+            errors.push(`- ${sourceName}: The request to the AI model failed. ${errorMessage.substring(0, 100)}...`);
+            continue; // Skip to the next input
+        }
+
+        try {
             const jsonText = response.text.trim();
-            
-            // A robust regex to extract the JSON object from potential markdown code blocks, 
-            // which can happen with non-JSON response types (like when using the googleSearch tool).
             const jsonMatch = jsonText.match(/```(json)?\s*([\s\S]*?)\s*```|({[\s\S]*})/);
-            const parsableText = jsonMatch ? (jsonMatch[2] || jsonMatch[3]) : jsonText;
+            const parsableText = jsonMatch ? (jsonMatch[2] || jsonMatch[3]) : null;
 
             if (!parsableText) {
-                throw new Error("Could not find a valid JSON object in the model's response.");
+                throw new Error(`No valid JSON object found in the model's response.`);
             }
             
-            const result = JSON.parse(parsableText) as ScrapedData;
+            const result: ScrapedData = JSON.parse(parsableText) as ScrapedData;
+            
+            if (!result || !Array.isArray(result.categories)) {
+                errors.push(`- ${sourceName}: The model returned data in an unexpected format.`);
+                continue; // Skip to the next input
+            }
+
+            if (result.categories.length === 0 && (result.supplierName === sourceName || result.supplierName === 'N/A')) {
+                errors.push(`- ${sourceName}: The model did not find any product data at this source.`);
+                continue; // Skip to the next input in the loop
+            }
             
              // Tag each variant with its source
             result.categories.forEach(category => {
@@ -271,10 +285,10 @@ export const scrapeSupplierData = async (
                 }
             });
 
-        } catch (error) {
-            console.error(`Error processing input ${sourceName}:`, error);
-            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-            errors.push(`- ${sourceName}: ${errorMessage.substring(0, 150)}...`);
+        } catch (parsingError) {
+            console.error(`Error parsing response for ${sourceName}:`, parsingError);
+            errors.push(`- ${sourceName}: The model's response was in an unexpected format and could not be read.`);
+            continue; // Skip to the next input
         }
     }
 
@@ -291,16 +305,23 @@ export const scrapeSupplierData = async (
     return combinedData;
 };
 
-
 export const chatWithDataStream = async function* (
     scrapedData: ScrapedData,
     message: string,
     history: ChatMessage[]
-) {
-    const ai = getAiClient(); // Initialize client just before use
-    // Use `ai.chats.create` for conversational chat and streaming.
+): AsyncGenerator<string> {
+    const ai = getAiClient();
+
+    // The history from the client includes the latest user message. For the API call,
+    // we need the history *before* the current user message.
+    const historyForApi = history.slice(0, -1).map(msg => ({
+        role: msg.role as ('user' | 'model'),
+        parts: [{ text: msg.text }]
+    }));
+
     const chat = ai.chats.create({
-        model: 'gemini-2.5-pro', // Use a powerful model for data analysis
+        model: 'gemini-2.5-pro',
+        history: historyForApi,
         config: {
             systemInstruction: `You are an intelligent assistant for analyzing product catalog data.
 The user has provided you with the following product data, which was extracted from supplier websites or documents.
@@ -318,20 +339,13 @@ ${JSON.stringify(scrapedData, null, 2)}
         },
     });
 
-    const previousMessages = history.slice(0, -1).map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text }]
-    }));
-
-    // The stream is initiated by `sendMessageStream`.
-    const stream = await chat.sendMessageStream({
-        message,
-        // The history can be passed along with the message in sendMessageStream
-        history: previousMessages 
-    });
-
-    // Iterate over the stream and yield the text from each chunk.
-    for await (const chunk of stream) {
-        yield chunk.text;
+    try {
+        const stream = await chat.sendMessageStream({ message });
+        for await (const chunk of stream) {
+            yield chunk.text;
+        }
+    } catch (error) {
+        console.error("Error during chat stream:", error);
+        yield "An error occurred while communicating with the AI. Please check the console for details.";
     }
 };
