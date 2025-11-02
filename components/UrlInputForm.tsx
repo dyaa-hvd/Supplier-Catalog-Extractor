@@ -157,14 +157,13 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             return null;
         }
         for (const url of validUrls) {
-            // FIX: The error variable in a catch block is of type 'unknown' in TypeScript.
-            // Accessing properties like 'error.type' would cause a compile-time error.
-            // Since any error from `new URL()` indicates an invalid format, we can simply
-            // catch the exception without inspecting it to handle the validation failure.
+            // FIX: Any error from `new URL()` indicates an invalid format. We can simply
+            // catch the exception without inspecting the error object itself. Using a
+            // catch variable provides better compatibility with older build environments.
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            } catch {
+            } catch (error) {
                 setError(`Invalid URL format: ${url}`);
                 return null;
             }

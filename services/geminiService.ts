@@ -1,3 +1,4 @@
+
 // FIX: Use standard import for @google/genai package.
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { ScrapedData, ScrapeInput, DetectionResult, ChatMessage } from '../types';
@@ -78,7 +79,8 @@ export const detectProducts = async (inputs: ScrapeInput[]): Promise<DetectionRe
                 `;
                 response = await ai.models.generateContent({
                     model: model,
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    // FIX: Simplified the contents to be a direct string prompt as per API guidelines for this use case.
+                    contents: prompt,
                     config: { tools: [{ googleSearch: {} }] }
                 });
             } else { // file
@@ -97,7 +99,8 @@ export const detectProducts = async (inputs: ScrapeInput[]): Promise<DetectionRe
                 `;
                 response = await ai.models.generateContent({
                     model: model,
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    // FIX: Simplified the contents to be a direct string prompt as per API guidelines for this use case.
+                    contents: prompt,
                     config: { responseMimeType: 'application/json' }
                 });
             }
@@ -236,7 +239,7 @@ export const scrapeSupplierData = async (
         } catch (requestError) {
             console.error(`Error during API request for ${sourceName}:`, requestError);
             const errorMessage = requestError instanceof Error ? requestError.message : "An unknown error occurred.";
-            errors.push(`- ${sourceName}: The request to the AI model failed. ${errorMessage.substring(0, 100)}...`);
+            errors.push(`- ${sourceName}: The request to the AI model failed (network issue). ${errorMessage.substring(0, 100)}...`);
             continue; // Skip to the next input
         }
 
@@ -249,7 +252,15 @@ export const scrapeSupplierData = async (
                 throw new Error(`No valid JSON object found in the model's response.`);
             }
             
-            const result: ScrapedData = JSON.parse(parsableText) as ScrapedData;
+            let result: ScrapedData;
+            try {
+                // Specific try-catch block for the JSON parsing logic
+                result = JSON.parse(parsableText) as ScrapedData;
+            } catch (jsonParseError) {
+                console.error(`Error parsing JSON for ${sourceName}:`, jsonParseError, `Raw text: ${parsableText.substring(0,500)}...`);
+                // Re-throw a more specific error for the outer catch block
+                throw new Error(`The model's response was not valid JSON and could not be read.`);
+            }
             
             if (!result || !Array.isArray(result.categories)) {
                 errors.push(`- ${sourceName}: The model returned data in an unexpected format.`);
@@ -285,9 +296,10 @@ export const scrapeSupplierData = async (
                 }
             });
 
-        } catch (parsingError) {
-            console.error(`Error parsing response for ${sourceName}:`, parsingError);
-            errors.push(`- ${sourceName}: The model's response was in an unexpected format and could not be read.`);
+        } catch (processingError) {
+            console.error(`Error processing response for ${sourceName}:`, processingError);
+            const errorMessage = processingError instanceof Error ? processingError.message : "The model's response could not be read.";
+            errors.push(`- ${sourceName}: ${errorMessage}`);
             continue; // Skip to the next input
         }
     }

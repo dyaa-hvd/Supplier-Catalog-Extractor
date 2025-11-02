@@ -1,6 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { InputForm } from './UrlInputForm';
-// FIX: Import the centralized LoadingState type to resolve the 'Cannot find name' error.
 import { ScrapeInput, DetectionResult, ChatMessage, LoadingState } from '../types';
 import { marked } from 'marked';
 
