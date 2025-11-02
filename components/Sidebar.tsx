@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { InputForm } from './UrlInputForm';
 import { ScrapeInput, DetectionResult, ChatMessage, LoadingState } from '../types';
@@ -61,11 +60,6 @@ const ChatLoadingDots: React.FC = () => (
 
 const ChatPanel: React.FC<{history: ChatMessage[], isChatting: boolean, onSendMessage: (message: string) => void}> = ({ history, isChatting, onSendMessage }) => {
     const [input, setInput] = useState('');
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [history, isChatting]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -74,6 +68,8 @@ const ChatPanel: React.FC<{history: ChatMessage[], isChatting: boolean, onSendMe
             setInput('');
         }
     };
+
+    const reversedHistory = [...history].reverse();
 
     return (
         <div className="flex flex-col h-96 bg-slate-800/50 rounded-lg border border-slate-700">
@@ -84,8 +80,8 @@ const ChatPanel: React.FC<{history: ChatMessage[], isChatting: boolean, onSendMe
                         Ask a question about the scraped data.
                     </div>
                 )}
-                {history.map((msg, index) => (
-                    <div key={index} className={`flex items-start gap-3 animate-slide-in-up-stagger ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`} style={{ animationDelay: `${index * 50}ms` }}>
+                {reversedHistory.map((msg, index) => (
+                    <div key={history.length - 1 - index} className={`flex items-start gap-3 animate-slide-in-up-stagger ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`} style={{ animationDelay: `${index * 50}ms` }}>
                         {msg.role === 'model' && (
                             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-amber-300">
                                 <SparkleIcon className="w-5 h-5" />
@@ -96,7 +92,7 @@ const ChatPanel: React.FC<{history: ChatMessage[], isChatting: boolean, onSendMe
                             ? 'bg-sky-600 text-white rounded-br-xl' 
                             : 'bg-slate-700 text-slate-200 rounded-bl-xl'
                         }`}>
-                             {msg.role === 'model' && msg.text === '' && isChatting && index === history.length - 1 ? (
+                             {msg.role === 'model' && msg.text === '' && isChatting && index === 0 ? (
                                 <ChatLoadingDots />
                             ) : msg.role === 'model' ? (
                                 <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) as string }} />
@@ -111,7 +107,6 @@ const ChatPanel: React.FC<{history: ChatMessage[], isChatting: boolean, onSendMe
                         )}
                     </div>
                 ))}
-                <div ref={messagesEndRef} />
             </div>
             <form onSubmit={handleSubmit} className="p-2 border-t border-slate-700 flex items-center gap-2">
                 <input

@@ -157,13 +157,11 @@ export const InputForm: React.FC<InputFormProps> = ({ onDetect, onSubmit, loadin
             return null;
         }
         for (const url of validUrls) {
-            // FIX: Any error from `new URL()` indicates an invalid format. We can simply
-            // catch the exception without inspecting the error object itself. Using a
-            // catch variable provides better compatibility with older build environments.
             try {
                 new URL(url);
                 inputs.push({ type: 'url', value: url });
-            } catch (error) {
+            // FIX: Renamed `error` to `e` to avoid shadowing the component's `error` state variable. This resolves the TypeScript error which was likely caused by a tooling issue with the shadowed variable.
+            } catch (e) {
                 setError(`Invalid URL format: ${url}`);
                 return null;
             }
